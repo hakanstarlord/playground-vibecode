@@ -1,3 +1,0 @@
-mss
-opencv-python
-numpy
