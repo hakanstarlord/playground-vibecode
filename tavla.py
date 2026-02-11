@@ -26,6 +26,7 @@ class BackgammonGame:
         self.borne_off: Dict[Player, int] = {"W": 0, "B": 0}
         self.current_player: Player = "W"
         self.dice_values: List[int] = []
+        self.last_roll_pair: Tuple[int, int] = (1, 1)
         self.setup_initial_position()
 
     def snapshot(self) -> dict:
@@ -35,6 +36,7 @@ class BackgammonGame:
             "borne_off": copy.deepcopy(self.borne_off),
             "current_player": self.current_player,
             "dice_values": self.dice_values.copy(),
+            "last_roll_pair": self.last_roll_pair,
         }
 
     def restore(self, data: dict) -> None:
@@ -43,6 +45,7 @@ class BackgammonGame:
         self.borne_off = data["borne_off"].copy()
         self.current_player = data["current_player"]
         self.dice_values = data["dice_values"].copy()
+        self.last_roll_pair = data["last_roll_pair"]
 
     def setup_initial_position(self) -> None:
         for p in self.points.values():
@@ -66,6 +69,7 @@ class BackgammonGame:
     def roll_dice(self) -> List[int]:
         d1 = random.randint(1, 6)
         d2 = random.randint(1, 6)
+        self.last_roll_pair = (d1, d2)
         self.dice_values = [d1] * 4 if d1 == d2 else [d1, d2]
         return self.dice_values.copy()
 
@@ -100,7 +104,6 @@ class BackgammonGame:
     def can_bear_off_from(self, player: Player, src: int, die: int) -> bool:
         if not self.all_in_home(player):
             return False
-
         if player == "W":
             if src - die == 0:
                 return True
@@ -191,6 +194,10 @@ class BackgammonUI:
         self.selected_moves: List[MoveOption] = []
         self.point_boxes: Dict[int, Tuple[int, int, int, int]] = {}
 
+        self.turn_start_snapshot: Optional[dict] = None
+        self.moves_this_turn = 0
+        self.dice_animating = False
+
         self.canvas = tk.Canvas(root, width=1080, height=720, bg="#1f3a3a", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True, padx=8, pady=8)
 
@@ -200,12 +207,21 @@ class BackgammonUI:
         self.turn_label = tk.Label(self.panel, text="", font=("Arial", 13, "bold"), fg="#f5d77e", bg="#2c4b4b")
         self.turn_label.pack(side="left", padx=10)
 
-        self.dice_label = tk.Label(self.panel, text="", font=("Arial", 12), fg="#fff2c1", bg="#2c4b4b")
-        self.dice_label.pack(side="left", padx=16)
+        self.roll_anim_label = tk.Label(
+            self.panel,
+            text="🎲",
+            font=("Arial", 18),
+            fg="#fff2c1",
+            bg="#2c4b4b",
+        )
+        self.roll_anim_label.pack(side="left", padx=(8, 0))
+
+        self.dice_canvas = tk.Canvas(self.panel, width=170, height=56, bg="#2c4b4b", highlightthickness=0)
+        self.dice_canvas.pack(side="left", padx=8)
 
         self.end_turn_btn = tk.Button(
             self.panel,
-            text="HAMLEYİ BİTİR",
+            text="HAMLELERİ ONAYLA",
             command=self.ask_end_turn,
             font=("Arial", 11, "bold"),
             bg="#e0b715",
@@ -227,17 +243,38 @@ class BackgammonUI:
 
     def start_turn(self, initial: bool = False) -> None:
         player = self.game.current_player
-        dice = self.game.roll_dice()
+        self.game.roll_dice()
+        self.turn_start_snapshot = self.game.snapshot()
+        self.moves_this_turn = 0
         self.selected_source = None
         self.selected_moves = []
         self.draw()
 
+        self.animate_dice_then_show(self.game.last_roll_pair)
+
         if not initial:
-            messagebox.showinfo("Yeni Tur", f"{self.player_text(player)} için zar: {dice}")
+            messagebox.showinfo("Yeni Tur", f"{self.player_text(player)} için zar atıldı.")
 
         if not self.game.legal_sources(player):
             messagebox.showinfo("Hamle Yok", f"{self.player_text(player)} için oynanabilir hamle yok.")
             self.switch_turn()
+
+    def animate_dice_then_show(self, final_pair: Tuple[int, int], frame_count: int = 10) -> None:
+        self.dice_animating = True
+
+        def step(frame: int) -> None:
+            if frame < frame_count:
+                random_pair = (random.randint(1, 6), random.randint(1, 6))
+                self.draw_dice_pair(random_pair)
+                self.roll_anim_label.config(text="🎲")
+                self.root.after(70, lambda: step(frame + 1))
+                return
+
+            self.roll_anim_label.config(text="🎲✅")
+            self.draw_dice_pair(final_pair)
+            self.dice_animating = False
+
+        step(0)
 
     def switch_turn(self) -> None:
         self.game.current_player = "B" if self.game.current_player == "W" else "W"
@@ -247,11 +284,9 @@ class BackgammonUI:
         self.canvas.delete("all")
         x0, y0, x1, y1 = self.board_rect()
 
-        # outer wooden frame
         self.canvas.create_rectangle(x0 - 22, y0 - 22, x1 + 22, y1 + 22, fill="#5b2f12", outline="#8a4f1f", width=4)
         self.canvas.create_rectangle(x0, y0, x1, y1, fill="#c88f55", outline="#76421d", width=4)
 
-        # board center bar
         center = (x0 + x1) // 2
         self.canvas.create_rectangle(center - 28, y0, center + 28, y1, fill="#9d6738", outline="#6e3d1b", width=2)
 
@@ -267,7 +302,6 @@ class BackgammonUI:
         tri_w = (x1 - x0 - 2 * 28) // (12 + gap_cols)
         top_colors = ["#6e3b1c", "#e5b176"]
 
-        # top points 13..24
         idx = 0
         for point in list(range(13, 19)) + list(range(19, 25)):
             col = idx if idx < 6 else idx + gap_cols
@@ -278,7 +312,6 @@ class BackgammonUI:
             self.point_boxes[point] = (left, y0, right, y0 + 240)
             idx += 1
 
-        # bottom points 12..1
         idx = 0
         for point in list(range(12, 6, -1)) + list(range(6, 0, -1)):
             col = idx if idx < 6 else idx + gap_cols
@@ -335,9 +368,31 @@ class BackgammonUI:
         self.canvas.create_text(x1 + 47, y1 - 45, text=str(self.game.borne_off["B"]), fill="#ffe58a", font=("Arial", 18, "bold"))
 
     def update_labels(self) -> None:
-        player = self.game.current_player
-        self.turn_label.config(text=f"Sıra: {self.player_text(player)}")
-        self.dice_label.config(text=f"Kalan Zarlar: {self.game.dice_values}")
+        self.turn_label.config(text=f"Sıra: {self.player_text(self.game.current_player)} | Hamle: {self.moves_this_turn}")
+
+    def draw_dice_pair(self, pair: Tuple[int, int]) -> None:
+        self.dice_canvas.delete("all")
+        self.draw_die_face(10, 8, pair[0])
+        self.draw_die_face(90, 8, pair[1])
+
+    def draw_die_face(self, x: int, y: int, value: int) -> None:
+        size = 58
+        self.dice_canvas.create_rectangle(x, y, x + size, y + size, fill="#f7f7f7", outline="#333", width=2)
+
+        pip_map = {
+            1: [(0.5, 0.5)],
+            2: [(0.25, 0.25), (0.75, 0.75)],
+            3: [(0.25, 0.25), (0.5, 0.5), (0.75, 0.75)],
+            4: [(0.25, 0.25), (0.75, 0.25), (0.25, 0.75), (0.75, 0.75)],
+            5: [(0.25, 0.25), (0.75, 0.25), (0.5, 0.5), (0.25, 0.75), (0.75, 0.75)],
+            6: [(0.25, 0.22), (0.75, 0.22), (0.25, 0.5), (0.75, 0.5), (0.25, 0.78), (0.75, 0.78)],
+        }
+
+        r = 4
+        for px, py in pip_map[value]:
+            cx = x + int(px * size)
+            cy = y + int(py * size)
+            self.dice_canvas.create_oval(cx - r, cy - r, cx + r, cy + r, fill="#111", outline="#111")
 
     def point_at(self, x: int, y: int) -> Optional[int]:
         for point, (left, top, right, bottom) in self.point_boxes.items():
@@ -371,6 +426,8 @@ class BackgammonUI:
             self.canvas.create_rectangle(left, top, right, bottom, outline="#9aff5a", width=3)
 
     def on_click(self, event: tk.Event) -> None:
+        if self.dice_animating:
+            return
         if self.game.borne_off["W"] == 15 or self.game.borne_off["B"] == 15:
             return
 
@@ -389,13 +446,11 @@ class BackgammonUI:
                 self.select_source(("point", clicked))
             return
 
-        # destination selection
         for die, target in self.selected_moves:
             if target == clicked:
-                self.try_move_with_confirmation(die, target)
+                self.apply_move(die, target)
                 return
 
-        # click bear-off zone if valid
         x0, _, x1, y1 = self.board_rect()
         if player == "W" and x0 - 82 <= event.x <= x0 - 12 and y1 - 115 <= event.y <= y1 - 10:
             self.try_bear_off()
@@ -404,7 +459,6 @@ class BackgammonUI:
             self.try_bear_off()
             return
 
-        # reselect source
         if self.game.points[clicked].owner == player and self.game.points[clicked].count > 0:
             self.select_source(("point", clicked))
 
@@ -418,49 +472,46 @@ class BackgammonUI:
             return
         for die, target in self.selected_moves:
             if target is None:
-                self.try_move_with_confirmation(die, None)
+                self.apply_move(die, None)
                 return
 
-    def try_move_with_confirmation(self, die: int, target: Optional[int]) -> None:
+    def apply_move(self, die: int, target: Optional[int]) -> None:
         if not self.selected_source:
             return
-
         player = self.game.current_player
-        before = self.game.snapshot()
-        moved = self.game.move_checker(self.selected_source, die, target, player)
-        if not moved:
-            return
-
-        self.draw()
-        move_text = f"zar {die} ile {'toplamaya' if target is None else f'hane {target}e'} oynandı"
-        ok = messagebox.askyesno("Hamle Onayı", f"{self.player_text(player)}: {move_text}.\nBu hamle son kararın mı?")
-
-        if not ok:
-            self.game.restore(before)
+        if self.game.move_checker(self.selected_source, die, target, player):
+            self.moves_this_turn += 1
+            self.selected_source = None
+            self.selected_moves = []
             self.draw()
-            return
-
-        self.selected_source = None
-        self.selected_moves = []
-        self.draw()
-        self.post_move()
-
-    def post_move(self) -> None:
-        if self.game.borne_off["W"] == 15:
-            messagebox.showinfo("Oyun Bitti", "Kazanan: Beyaz")
-            return
-        if self.game.borne_off["B"] == 15:
-            messagebox.showinfo("Oyun Bitti", "Kazanan: Siyah")
-            return
-
-        if not self.game.dice_values or not self.game.legal_sources(self.game.current_player):
-            self.ask_end_turn(auto=True)
+            if self.game.borne_off["W"] == 15:
+                messagebox.showinfo("Oyun Bitti", "Kazanan: Beyaz")
+                return
+            if self.game.borne_off["B"] == 15:
+                messagebox.showinfo("Oyun Bitti", "Kazanan: Siyah")
+                return
+            if not self.game.dice_values or not self.game.legal_sources(player):
+                self.ask_end_turn(auto=True)
 
     def ask_end_turn(self, auto: bool = False) -> None:
+        if self.turn_start_snapshot is None:
+            return
+
         player_name = self.player_text(self.game.current_player)
-        if not auto:
-            if not messagebox.askyesno("Tur Onayı", f"{player_name}, hamlen bitti mi?"):
-                return
+        if auto:
+            prompt = f"{player_name}, mevcut hamlelerin bitti.\nToplam {self.moves_this_turn} hamleni onaylıyor musun?"
+        else:
+            prompt = f"{player_name}, toplam {self.moves_this_turn} hamleni onaylıyor musun?"
+
+        if not messagebox.askyesno("Tur Onayı", prompt):
+            self.game.restore(self.turn_start_snapshot)
+            self.moves_this_turn = 0
+            self.selected_source = None
+            self.selected_moves = []
+            self.draw()
+            self.draw_dice_pair(self.game.last_roll_pair)
+            return
+
         self.switch_turn()
 
 

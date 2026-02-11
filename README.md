@@ -7,11 +7,12 @@ Bu proje `tavla.py` içinde Tkinter ile geliştirilmiş, masaüstünde çalışa
 - Ahşap görünümlü tavla tahtası (referans görsele yakın stil).
 - Standart başlangıç dizilimi (15 taş).
 - Zarlar her tur başlangıcında otomatik atılır.
-- Her taş hamlesinden sonra: **"Bu hamle son kararın mı?"** onayı.
-- Oyuncu isterse **HAMLEYİ BİTİR** butonuyla turu bitirir ve
-  **"hamlen bitti mi?"** onayı alınır.
-- Vurma (hit), bar'a gönderme, bar'dan geri giriş.
-- Uygun durumda taş toplama (bear-off).
+- Metin yerine zar yüzleri için görsel zar arayüzü.
+- Tur başında **zar GIF benzeri animasyonlu atış efekti**.
+- Hamle başına tek tek onay yok; oyuncu tüm hamlelerini yaptıktan sonra
+  **HAMLELERİ ONAYLA** ile toplu onay verir.
+- Tur onayı reddedilirse o tur yapılan hamlelerin tamamı geri alınır.
+- Vurma (hit), bar'a gönderme, bar'dan geri giriş, taş toplama (bear-off).
 
 ## Çalıştırma
 ```bash
