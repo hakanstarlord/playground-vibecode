@@ -193,13 +193,15 @@ class BackgammonUI:
         self.selected_source: Optional[Source] = None
         self.selected_moves: List[MoveOption] = []
         self.point_boxes: Dict[int, Tuple[int, int, int, int]] = {}
+        self.bar_click_box: Optional[Tuple[int, int, int, int]] = None
 
         self.turn_start_snapshot: Optional[dict] = None
         self.moves_this_turn = 0
         self.dice_animating = False
 
-        self.canvas = tk.Canvas(root, width=1080, height=720, bg="#1f3a3a", highlightthickness=0)
+        self.canvas = tk.Canvas(root, width=1400, height=780, bg="#1f3a3a", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True, padx=8, pady=8)
+        self.canvas.bind("<Configure>", self.on_resize)
 
         self.panel = tk.Frame(root, bg="#2c4b4b")
         self.panel.pack(fill="x", padx=8, pady=(0, 8))
@@ -207,13 +209,7 @@ class BackgammonUI:
         self.turn_label = tk.Label(self.panel, text="", font=("Arial", 13, "bold"), fg="#f5d77e", bg="#2c4b4b")
         self.turn_label.pack(side="left", padx=10)
 
-        self.roll_anim_label = tk.Label(
-            self.panel,
-            text="🎲",
-            font=("Arial", 18),
-            fg="#fff2c1",
-            bg="#2c4b4b",
-        )
+        self.roll_anim_label = tk.Label(self.panel, text="🎲", font=("Arial", 18), fg="#fff2c1", bg="#2c4b4b")
         self.roll_anim_label.pack(side="left", padx=(8, 0))
 
         self.dice_canvas = tk.Canvas(self.panel, width=170, height=56, bg="#2c4b4b", highlightthickness=0)
@@ -234,12 +230,22 @@ class BackgammonUI:
         self.canvas.bind("<Button-1>", self.on_click)
         self.start_turn(initial=True)
 
+    def on_resize(self, _event: tk.Event) -> None:
+        self.draw()
+
     @staticmethod
     def player_text(player: Player) -> str:
         return "Beyaz" if player == "W" else "Siyah"
 
     def board_rect(self) -> Tuple[int, int, int, int]:
-        return 90, 70, 990, 650
+        width = max(self.canvas.winfo_width(), 1200)
+        height = max(self.canvas.winfo_height(), 680)
+
+        board_w = 1020
+        board_h = 620
+        x0 = (width - board_w) // 2
+        y0 = max(40, (height - board_h) // 2 - 20)
+        return x0, y0, x0 + board_w, y0 + board_h
 
     def start_turn(self, initial: bool = False) -> None:
         player = self.game.current_player
@@ -288,18 +294,20 @@ class BackgammonUI:
         self.canvas.create_rectangle(x0, y0, x1, y1, fill="#c88f55", outline="#76421d", width=4)
 
         center = (x0 + x1) // 2
-        self.canvas.create_rectangle(center - 28, y0, center + 28, y1, fill="#9d6738", outline="#6e3d1b", width=2)
+        self.canvas.create_rectangle(center - 30, y0, center + 30, y1, fill="#9d6738", outline="#6e3d1b", width=2)
+        self.bar_click_box = (center - 30, y0, center + 30, y1)
 
         self.point_boxes.clear()
         self.draw_triangles(x0, y0, x1, y1)
         self.draw_checkers()
+        self.draw_bar_checkers(x0, y0, x1, y1)
         self.draw_info_areas(x0, y0, x1, y1)
         self.draw_highlights()
         self.update_labels()
 
     def draw_triangles(self, x0: int, y0: int, x1: int, y1: int) -> None:
         gap_cols = 2
-        tri_w = (x1 - x0 - 2 * 28) // (12 + gap_cols)
+        tri_w = (x1 - x0 - 2 * 30) // (12 + gap_cols)
         top_colors = ["#6e3b1c", "#e5b176"]
 
         idx = 0
@@ -341,31 +349,44 @@ class BackgammonUI:
                 ty = top + 24 + 5 * 38 if top_half else bottom - 24 - 5 * 38
                 self.canvas.create_text(cx, ty, text=f"x{stack.count}", font=("Arial", 10, "bold"), fill="#2b1a0e")
 
+    def draw_bar_checkers(self, x0: int, y0: int, x1: int, y1: int) -> None:
+        center = (x0 + x1) // 2
+        self.canvas.create_text(center, y0 - 26, text="BAR", fill="#ffd972", font=("Arial", 14, "bold"))
+
+        # white hit checkers in lower half of center bar
+        for i in range(min(self.game.bar["W"], 6)):
+            self.paint_checker(center, y1 - 32 - i * 34, "W", 14)
+        if self.game.bar["W"] > 6:
+            self.canvas.create_text(center, y1 - 32 - 6 * 34, text=f"x{self.game.bar['W']}", fill="#fff", font=("Arial", 9, "bold"))
+
+        # black hit checkers in upper half of center bar
+        for i in range(min(self.game.bar["B"], 6)):
+            self.paint_checker(center, y0 + 32 + i * 34, "B", 14)
+        if self.game.bar["B"] > 6:
+            self.canvas.create_text(center, y0 + 32 + 6 * 34, text=f"x{self.game.bar['B']}", fill="#fff", font=("Arial", 9, "bold"))
+
     def paint_checker(self, cx: int, cy: int, owner: Player, r: int) -> None:
         fill = "#f1f1f1" if owner == "W" else "#171717"
         outline = "#8a8a8a" if owner == "W" else "#c0c0c0"
         self.canvas.create_oval(cx - r, cy - r, cx + r, cy + r, fill=fill, outline=outline, width=2)
-        self.canvas.create_oval(cx - r + 6, cy - r + 6, cx + r - 6, cy + r - 6, outline=outline, width=1)
+        self.canvas.create_oval(cx - r + 5, cy - r + 5, cx + r - 5, cy + r - 5, outline=outline, width=1)
 
     def draw_info_areas(self, x0: int, y0: int, x1: int, y1: int) -> None:
-        center = (x0 + x1) // 2
-        self.canvas.create_text(center, y0 - 26, text="BAR", fill="#ffd972", font=("Arial", 14, "bold"))
+        self.canvas.create_rectangle(x0 - 86, y0 + 15, x0 - 12, y0 + 125, fill="#7a4a27", outline="#e7b676", width=2)
+        self.canvas.create_text(x0 - 49, y0 + 45, text="W BAR", fill="#fff", font=("Arial", 10, "bold"))
+        self.canvas.create_text(x0 - 49, y0 + 88, text=str(self.game.bar["W"]), fill="#ffe58a", font=("Arial", 18, "bold"))
 
-        self.canvas.create_rectangle(x0 - 82, y0 + 10, x0 - 12, y0 + 115, fill="#7a4a27", outline="#e7b676", width=2)
-        self.canvas.create_text(x0 - 47, y0 + 40, text="W BAR", fill="#fff", font=("Arial", 10, "bold"))
-        self.canvas.create_text(x0 - 47, y0 + 80, text=str(self.game.bar["W"]), fill="#ffe58a", font=("Arial", 18, "bold"))
+        self.canvas.create_rectangle(x1 + 12, y0 + 15, x1 + 86, y0 + 125, fill="#7a4a27", outline="#e7b676", width=2)
+        self.canvas.create_text(x1 + 49, y0 + 45, text="B BAR", fill="#fff", font=("Arial", 10, "bold"))
+        self.canvas.create_text(x1 + 49, y0 + 88, text=str(self.game.bar["B"]), fill="#ffe58a", font=("Arial", 18, "bold"))
 
-        self.canvas.create_rectangle(x1 + 12, y0 + 10, x1 + 82, y0 + 115, fill="#7a4a27", outline="#e7b676", width=2)
-        self.canvas.create_text(x1 + 47, y0 + 40, text="B BAR", fill="#fff", font=("Arial", 10, "bold"))
-        self.canvas.create_text(x1 + 47, y0 + 80, text=str(self.game.bar["B"]), fill="#ffe58a", font=("Arial", 18, "bold"))
+        self.canvas.create_rectangle(x0 - 86, y1 - 125, x0 - 12, y1 - 15, fill="#7a4a27", outline="#e7b676", width=2)
+        self.canvas.create_text(x0 - 49, y1 - 95, text="W OFF", fill="#fff", font=("Arial", 10, "bold"))
+        self.canvas.create_text(x0 - 49, y1 - 52, text=str(self.game.borne_off["W"]), fill="#ffe58a", font=("Arial", 18, "bold"))
 
-        self.canvas.create_rectangle(x0 - 82, y1 - 115, x0 - 12, y1 - 10, fill="#7a4a27", outline="#e7b676", width=2)
-        self.canvas.create_text(x0 - 47, y1 - 85, text="W OFF", fill="#fff", font=("Arial", 10, "bold"))
-        self.canvas.create_text(x0 - 47, y1 - 45, text=str(self.game.borne_off["W"]), fill="#ffe58a", font=("Arial", 18, "bold"))
-
-        self.canvas.create_rectangle(x1 + 12, y1 - 115, x1 + 82, y1 - 10, fill="#7a4a27", outline="#e7b676", width=2)
-        self.canvas.create_text(x1 + 47, y1 - 85, text="B OFF", fill="#fff", font=("Arial", 10, "bold"))
-        self.canvas.create_text(x1 + 47, y1 - 45, text=str(self.game.borne_off["B"]), fill="#ffe58a", font=("Arial", 18, "bold"))
+        self.canvas.create_rectangle(x1 + 12, y1 - 125, x1 + 86, y1 - 15, fill="#7a4a27", outline="#e7b676", width=2)
+        self.canvas.create_text(x1 + 49, y1 - 95, text="B OFF", fill="#fff", font=("Arial", 10, "bold"))
+        self.canvas.create_text(x1 + 49, y1 - 52, text=str(self.game.borne_off["B"]), fill="#ffe58a", font=("Arial", 18, "bold"))
 
     def update_labels(self) -> None:
         self.turn_label.config(text=f"Sıra: {self.player_text(self.game.current_player)} | Hamle: {self.moves_this_turn}")
@@ -399,10 +420,11 @@ class BackgammonUI:
             if left <= x <= right and top <= y <= bottom:
                 return point
 
-        x0, y0, x1, y1 = self.board_rect()
-        center = (x0 + x1) // 2
-        if center - 28 <= x <= center + 28 and y0 <= y <= y1:
-            return 0
+        if self.bar_click_box:
+            bx0, by0, bx1, by1 = self.bar_click_box
+            if bx0 <= x <= bx1 and by0 <= y <= by1:
+                return 0
+
         return None
 
     def draw_highlights(self) -> None:
@@ -413,14 +435,17 @@ class BackgammonUI:
         if loc == "point":
             left, top, right, bottom = self.point_boxes[idx]
             self.canvas.create_rectangle(left, top, right, bottom, outline="#42a5ff", width=3)
+        elif self.bar_click_box:
+            bx0, by0, bx1, by1 = self.bar_click_box
+            self.canvas.create_rectangle(bx0, by0, bx1, by1, outline="#42a5ff", width=3)
 
         for _, target in self.selected_moves:
             if target is None:
                 x0, _, x1, y1 = self.board_rect()
                 if self.game.current_player == "W":
-                    self.canvas.create_rectangle(x0 - 86, y1 - 118, x0 - 8, y1 - 6, outline="#9aff5a", width=3)
+                    self.canvas.create_rectangle(x0 - 90, y1 - 128, x0 - 8, y1 - 8, outline="#9aff5a", width=3)
                 else:
-                    self.canvas.create_rectangle(x1 + 8, y1 - 118, x1 + 86, y1 - 6, outline="#9aff5a", width=3)
+                    self.canvas.create_rectangle(x1 + 8, y1 - 128, x1 + 90, y1 - 8, outline="#9aff5a", width=3)
                 continue
             left, top, right, bottom = self.point_boxes[target]
             self.canvas.create_rectangle(left, top, right, bottom, outline="#9aff5a", width=3)
@@ -452,10 +477,10 @@ class BackgammonUI:
                 return
 
         x0, _, x1, y1 = self.board_rect()
-        if player == "W" and x0 - 82 <= event.x <= x0 - 12 and y1 - 115 <= event.y <= y1 - 10:
+        if player == "W" and x0 - 86 <= event.x <= x0 - 12 and y1 - 125 <= event.y <= y1 - 15:
             self.try_bear_off()
             return
-        if player == "B" and x1 + 12 <= event.x <= x1 + 82 and y1 - 115 <= event.y <= y1 - 10:
+        if player == "B" and x1 + 12 <= event.x <= x1 + 86 and y1 - 125 <= event.y <= y1 - 15:
             self.try_bear_off()
             return
 
