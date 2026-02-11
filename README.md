@@ -1,13 +1,15 @@
 # Tavla (2 Oyuncu, Mouse Kontrollü)
 
-Bu proje `tavla.py` içinde Tkinter ile geliştirilmiş 2 kişilik tavla oyununu içerir.
+Bu proje `tavla.py` içinde Tkinter ile geliştirilmiş, masaüstünde çalışan 2 kişilik tavla oyununu içerir.
 
 ## Özellikler
 - Mouse ile taş seçme ve hedef haneye taşıma.
+- Ahşap görünümlü tavla tahtası (referans görsele yakın stil).
 - Standart başlangıç dizilimi (15 taş).
 - Zarlar her tur başlangıcında otomatik atılır.
-- Oyuncu isterse **Hamleyi Bitir** butonuyla turu bitirir ve
-  "Hamlen bitti mi?" onayı sorulur.
+- Her taş hamlesinden sonra: **"Bu hamle son kararın mı?"** onayı.
+- Oyuncu isterse **HAMLEYİ BİTİR** butonuyla turu bitirir ve
+  **"hamlen bitti mi?"** onayı alınır.
 - Vurma (hit), bar'a gönderme, bar'dan geri giriş.
 - Uygun durumda taş toplama (bear-off).
 
