@@ -1,76 +1,39 @@
-# Personal Finance Simulator (Python)
+# Personal Finance Editor (Desktop GUI)
 
-A modular CLI application for portfolio tracking and forward simulation using deterministic compounding and Monte Carlo analysis.
+A fully visual desktop app built with **PySide6 + matplotlib + SQLite** to manage an investment portfolio, inspect allocation, and project a 1-year plan with monthly contributions.
 
-## Proposed folder structure
+## UI Layout Outline
 
-```text
-personal_finance_simulator/
-  __init__.py
-  cli.py            # argparse CLI (add-asset, add-tx, show, simulate)
-  models.py         # dataclasses: Asset, Transaction
-  storage.py        # SQLite schema, CRUD functions, portfolio aggregation
-  simulation.py     # deterministic + Monte Carlo engines
-  plotting.py       # matplotlib charts
-README.md
-```
+- **Left Panel: Portfolio Editor**
+  - Asset table with columns: symbol, name, category, currency, current value, expected return
+  - Buttons: Add, Edit, Delete, Save, Reset Demo Data
+- **Right Panel: Analytics & Planning**
+  - Donut chart for allocation percentages
+  - Monthly contribution input
+  - Target weights table (editable)
+  - Projection result summary (projected total, absolute gain, % gain)
+  - 12-month line chart for total portfolio value
 
-## Features
+> MVP assumption: currency conversion is not implemented yet; all asset values are treated as the same base currency in charts and projection.
 
-- Data model with `Asset`, `Transaction`, and `Portfolio` aggregate
-- SQLite persistence with required functions:
-  - `add_asset()`
-  - `add_transaction()`
-  - `list_portfolio()`
-  - `portfolio_value()`
-- Simulation modes:
-  - Deterministic monthly compound growth
-  - Monte Carlo (>= 2000 runs) with monthly return conversion from annual assumptions
-- Outputs median / p10 / p90 outcomes
-- Monthly contribution plan allocated by target weights
-- CLI commands:
-  - `add-asset`
-  - `add-tx`
-  - `show`
-  - `simulate`
-- Visualization with matplotlib:
-  - Deterministic growth curve
-  - Monte Carlo percentile band
-- Demo dataset auto-seeded if DB is empty
+## How to Run (Windows)
 
-## Installation
-
-```bash
+```powershell
+# 1) Create virtual environment
 python -m venv .venv
-source .venv/bin/activate
-pip install matplotlib numpy
+
+# 2) Activate
+.\.venv\Scripts\Activate.ps1
+
+# 3) Install dependencies
+pip install PySide6 matplotlib
+
+# 4) Run GUI
+python app.py
 ```
 
-## Run
+## Notes for Extension
 
-```bash
-python -m personal_finance_simulator.cli --db finance.db show
-```
-
----
-
-## README-style example usage
-
-```bash
-# 1) Show seeded demo data
-python -m personal_finance_simulator.cli --db finance.db show
-
-# 2) Add a custom asset
-python -m personal_finance_simulator.cli --db finance.db add-asset QQQ etf USD 0.10 0.22
-
-# 3) Add a transaction
-python -m personal_finance_simulator.cli --db finance.db add-tx 2026-01-15 QQQ buy 5 450 1
-
-# 4) Simulate 15 years with monthly contribution and target weights
-python -m personal_finance_simulator.cli --db finance.db simulate 15 1000 '{"SPY":0.6,"AGG":0.3,"QQQ":0.1}' --runs 4000
-
-# Output includes end-value deterministic, p10, median, p90
-# and saves:
-#   deterministic_growth.png
-#   monte_carlo_band.png
-```
+- Future-ready for adding multi-currency conversion.
+- Easy to add live price fetchers/API integrations.
+- SQLite DB auto-creates on first launch (`portfolio_editor.db`).
