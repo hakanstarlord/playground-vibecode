@@ -1,0 +1,14 @@
+{
+  "name": "telegram-daily-report",
+  "version": "1.0.0",
+  "description": "Telegram bot that sends daily weather, market and football summary",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "check": "node --check index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
